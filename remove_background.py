@@ -118,7 +118,7 @@ if __name__ == "__main__":
     process_sequence(
         input_dir="input_frames",
         output_dir="output_alpha",
-        model_path="models/rvm_mobilenetv3_fp32.torchscript",
+        model_path="models/rvm_resnet50_fp32.torchscript",
         base_image_path=None,  # 精度を上げるために、背景削除済みの画像を指定してください (例: "path/to/your/base_image.png")
 
         # --- ポストプロセッシング設定 ---
