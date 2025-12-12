@@ -19,7 +19,7 @@ def composite_foreground(img, fgr, pha):
     return out
 
 # 連番画像処理
-def process_sequence(input_dir, output_dir, model_path, base_image_path=None):
+def process_sequence(input_dir, output_dir, model_path, base_image_path=None, median_blur_ksize=0, erosion_iterations=0):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = load_rvm(model_path, device)
 
@@ -85,10 +85,25 @@ def process_sequence(input_dir, output_dir, model_path, base_image_path=None):
         with torch.no_grad():
             fgr, pha, *rec = model(tensor, *rec)
 
+        # --- Alpha Matte Post-processing ---
+        alpha_matte = (pha[0].cpu().squeeze().numpy() * 255).astype(np.uint8)
+
+        if median_blur_ksize > 0:
+            if median_blur_ksize % 2 == 1:  # Kernel size must be odd
+                alpha_matte = cv2.medianBlur(alpha_matte, median_blur_ksize)
+            else:
+                print(f"Warning: median_blur_ksize ({median_blur_ksize}) is not an odd number. Skipping median blur.")
+
+        if erosion_iterations > 0:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            alpha_matte = cv2.erode(alpha_matte, kernel, iterations=erosion_iterations)
+
+        # --- End Post-processing ---
+
         # 合成して背景透明PNG出力
         rgba = np.dstack([
             (fgr[0].cpu().permute(1,2,0).numpy() * 255).astype(np.uint8),
-            (pha[0].cpu().squeeze().numpy() * 255).astype(np.uint8)
+            alpha_matte
         ])
 
         out_path = os.path.join(output_dir, os.path.splitext(file)[0] + ".png")
@@ -104,5 +119,9 @@ if __name__ == "__main__":
         input_dir="input_frames",
         output_dir="output_alpha",
         model_path="models/rvm_mobilenetv3_fp32.torchscript",
-        base_image_path="path/to/your/base_image.png"  # 精度を上げるために、背景削除済みの画像を指定してください
+        base_image_path=None,  # 精度を上げるために、背景削除済みの画像を指定してください (例: "path/to/your/base_image.png")
+
+        # --- ポストプロセッシング設定 ---
+        median_blur_ksize=3,    # アルファマットの平滑化。エッジのジャギーを低減 (奇数、0で無効)
+        erosion_iterations=1    # アルファマットの収縮。前景の輪郭を調整し、背景の映り込みを軽減 (0で無効)
     )
