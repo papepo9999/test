@@ -1,0 +1,8 @@
+# Ignore the directory containing large model files
+models/
+
+# Ignore the output directory
+output_alpha/
+
+# Ignore Python cache files
+__pycache__/
